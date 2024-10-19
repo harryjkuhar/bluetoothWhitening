@@ -65,6 +65,41 @@ private:
     LinearFeedbackShiftRegister lsfr;
 };
 
+class BluetoothCrc
+{
+public:
+    const uint32_t bluetoothCrcPoly = 0x11021;
+    const uint32_t bluetoothCrcRegCnt = 16;
+
+    BluetoothCrc(uint8_t uap)
+        :lsfr(bluetoothCrcRegCnt, uap)
+    {
+        // poly from bluetooth spec for whitening
+        lsfr.AddGaloisPoly(bluetoothCrcPoly);
+        // standard generator, only including output of the final register
+        lsfr.AddGeneratorPoly(1 << (bluetoothCrcRegCnt - 1));
+        lsfr.AddInputPoly(bluetoothCrcPoly);
+    }
+
+    void CalcCrc(std::vector<uint8_t>& dataIn, uint16_t& crcVal)
+    {
+        size_t dataIndex = 0;
+
+        lsfr.ClearDataOut(0);
+        lsfr.Shift(static_cast<uint32_t>(dataIn.size() * 8), dataIn);
+        
+        crcVal = (uint16_t)lsfr.GetState();
+//        crcVal = lsfr.GetDataOut(0)[dataIn.size()] | lsfr.GetDataOut(0)[dataIn.size() + 1] << 8;
+    }
+//    FEDC BA98 7654 3210
+//    1011 0110 0100 1011
+//    1101 0010 0110 1101
+//    D    2    6    D
+private:
+
+    LinearFeedbackShiftRegister lsfr;
+};
+
 void printhelp(const char* exeName)
 {
     printf("%s [BluetoothClk] [[testData] or [filename]]\n", exeName);
@@ -84,12 +119,18 @@ int main(int argc, const char* argv[])
     uint32_t temp = 0;
     bool btClockParsed = false;
     bool forcebinaryFile = false;
+    bool crcMode = false;
+
     for (int i = 1; i < argc; i++)
     {
         char* endPtr = nullptr;
         if (strcmp(argv[i], "--b") == 0)
         {
             forcebinaryFile = true;
+        }
+        else if (strcmp(argv[i], "--c") == 0)
+        {
+            crcMode = true;
         }
         else if (btClockParsed == false)
         {
@@ -161,6 +202,7 @@ int main(int argc, const char* argv[])
 
         }
     }
+
     if (btClockParsed == false)
     {
         printf("No valid Bluetooth clock value detected!\n");
@@ -174,13 +216,24 @@ int main(int argc, const char* argv[])
         exit(-3);
     }
 
-    BluetoothWhitening whitening(btClock);
-    whitening.WhitenData(testData, dataOut);
-
-    for (size_t i = 0; i < dataOut.size(); i++)
+    if (crcMode)
     {
-        printf("%02X ", dataOut[i]);
+        uint16_t crcVal;
+        BluetoothCrc crcGen(btClock);
+        crcGen.CalcCrc(testData, crcVal);
+        printf("uap %02X crc %04X\n", btClock, crcVal);
     }
-    printf("\n");
+    else
+    {
+        //60 10 D0 00 C1 9E 81 3F AB 74 72 97 86 5D 64 0C 01 2A C2 CB E7 09
+        BluetoothWhitening whitening(btClock);
+        whitening.WhitenData(testData, dataOut);
+
+        for (size_t i = 0; i < dataOut.size(); i++)
+        {
+            printf("%02X ", dataOut[i]);
+        }
+        printf("\n");
+    }
 }
 

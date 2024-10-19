@@ -25,6 +25,8 @@ class LinearFeedbackShiftRegister
 public:
     LinearFeedbackShiftRegister(uint32_t registerCount, uint32_t initState)
     {
+        m_DataBitIndex = 0;
+        m_DataInputPoly = 0;
         m_BitShiftValue = 0x80;
         m_rightShift = true;
         m_registerCount = registerCount;
@@ -77,14 +79,19 @@ public:
             }
         }
     }
-
-    void Shift(uint32_t bitCount = 1)
+    
+    void AddInputPoly(uint32_t poly)
     {
-        for (uint32_t i = 0; i < bitCount; i++)
+        m_DataInputPoly = poly;
+    }
+
+    void Shift(uint32_t bitCount = 1, const std::vector<uint8_t>& dataPayload = {})
+    {
+        for (uint32_t i = 0; i < bitCount; i++, m_DataBitIndex++)
         {
             for (uint32_t regIndex = 0; regIndex < m_registerCount; regIndex++)
             {
-                m_nextStates[regIndex] = XorInputs(regIndex);
+                m_nextStates[regIndex] = XorInputs(regIndex, dataPayload);
             }
             for (uint32_t genIndex = 0; genIndex < m_GeneratorInputs.size(); genIndex++)
             {
@@ -122,7 +129,7 @@ public:
         }
     }
 
-    uint32_t XorInputs(uint32_t regIndex)
+    uint32_t XorInputs(uint32_t regIndex, const std::vector<uint8_t>& dataPayload = {})
     {
         uint32_t output = 0;
         for(uint32_t i = 0; i < m_registerInputs[regIndex].size(); i++)
@@ -130,6 +137,16 @@ public:
             uint32_t stateIndex = m_registerInputs[regIndex][i];
             output ^= m_states[stateIndex];
         }
+        if ((m_DataInputPoly & (1 << regIndex)) != 0)
+        {
+            uint32_t byteIndex = m_DataBitIndex / 8;
+            uint32_t bitIndex = m_DataBitIndex & 0x7;
+            if (byteIndex < dataPayload.size())
+            {
+                output ^= (dataPayload[byteIndex] >> bitIndex) & 1;
+            }
+        }
+
         return output;
     }
 
@@ -153,6 +170,17 @@ public:
     uint8_t GetBitShiftValue() { return m_BitShiftValue;}
     void SetBitShiftValue(uint8_t val) { m_BitShiftValue = val; }
 
+    uint32_t GetState()
+    {
+        uint32_t stateVal = 0;
+        for (size_t i = 0; i < m_registerCount; i++)
+        {
+            stateVal >>= 1;
+            stateVal |= m_states[(m_registerCount-1) - i] ? 0x8000 : 0;
+        }
+        return stateVal;
+    }
+
 private:
     uint8_t m_BitShiftValue;
     bool m_rightShift;
@@ -160,8 +188,13 @@ private:
     uint32_t m_initState;
 //    uint32_t m_feedBackPoly;
 //    std::vector<uint32_t> m_generatorPolys;
-    std::vector< std::vector <uint32_t>> m_registerInputs;
-    std::vector< std::vector <uint32_t>> m_GeneratorInputs;
+    std::vector<std::vector <uint32_t>> m_registerInputs;
+    std::vector<std::vector <uint32_t>> m_GeneratorInputs;
+    
+
+    uint32_t m_DataInputPoly;
+    uint32_t m_DataBitIndex;
+
     std::vector<uint32_t> m_states;
     std::vector<uint32_t> m_nextStates;
     std::vector<GeneratorState> m_genOut;
