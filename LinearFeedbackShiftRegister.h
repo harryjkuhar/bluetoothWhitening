@@ -161,9 +161,18 @@ public:
         }
         return m_genOut[index].m_dataOut; 
     }
-    void ClearDataOut(uint32_t index)
+    void ClearDataOut(uint32_t index, bool resetState = true)
     {
         m_genOut[index].clear();
+        m_DataBitIndex = 0;
+        if (resetState)
+        {
+            for (int i = 0; i < m_states.size(); i++)
+            {
+                m_states[i] = 0;
+                m_nextStates[i] = 0;
+            }
+        }
     }
     size_t GetGeneratorCount() { return m_genOut.size(); }
 
@@ -173,10 +182,11 @@ public:
     uint32_t GetState()
     {
         uint32_t stateVal = 0;
+        uint32_t shiftInBit = 1 << (m_registerCount - 1);
         for (size_t i = 0; i < m_registerCount; i++)
         {
             stateVal >>= 1;
-            stateVal |= m_states[(m_registerCount-1) - i] ? 0x8000 : 0;
+            stateVal |= m_states[(m_registerCount-1) - i] ? shiftInBit : 0;
         }
         return stateVal;
     }
