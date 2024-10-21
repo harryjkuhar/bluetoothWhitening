@@ -6,6 +6,24 @@
 #include <vector>
 #include <string>
 
+#ifndef _WIN32
+int fopen_s(FILE** pFile, const char *filename, const char *mode)
+{
+    (*pFile) = fopen(filename, mode);
+    if(*pFile != nullptr)
+    {
+        return 0;
+    }
+    else
+    {
+        return errno;
+    }
+}
+
+#define fscanf_s    fscanf
+#endif
+
+
 const char* unitTestWhitening =
     "unitTestWhitening "
     "60 "
