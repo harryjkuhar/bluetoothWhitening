@@ -25,20 +25,16 @@ class LinearFeedbackShiftRegister
 public:
     LinearFeedbackShiftRegister(uint32_t registerCount, uint32_t initState)
     {
-        m_DataBitIndex = 0;
-        m_DataInputPoly = 0;
-        m_BitShiftValue = 0x80;
-        m_rightShift = true;
         m_registerCount = registerCount;
-        m_initState = initState;
-        
+        m_DataInputPoly = 0;
+        m_registerInputs.resize(m_registerCount);
+        m_nextStates.resize(m_registerCount);
+        m_states.resize(m_registerCount);
+
         if (m_registerCount > sizeof(m_initState) * 8)
         {
             m_registerCount = sizeof(m_initState) * 8;
         }
-        
-        m_registerInputs.resize(m_registerCount);
-        m_nextStates.resize(m_registerCount);
 
         for (uint32_t i = 0; i < m_registerCount; i++)
         {
@@ -46,9 +42,19 @@ public:
             {
                 m_registerInputs[i + 1].push_back(i);
             }
-            m_states.push_back(m_initState & 1);
-            m_initState >>= 1;
         }
+
+        Reset(initState);
+    }
+
+    void Reset(uint32_t initState)
+    {
+        m_DataBitIndex = 0;
+        m_BitShiftValue = 0x80;
+        m_rightShift = true;
+        m_initState = initState;
+
+        ClearDataOut(0, true);
     }
 
     void AddGaloisPoly(uint32_t poly)
@@ -122,10 +128,13 @@ public:
                 }
 
             }
+            uint32_t stateVal = GetState();
             for (uint32_t regIndex = 0; regIndex < m_registerCount; regIndex++)
             {
                 m_states[regIndex] = m_nextStates[regIndex];
             }
+            uint32_t nextStateVal = GetState();
+//            printf("stateChange %u %08X -> %08X \n", (dataPayload[m_DataBitIndex / 8] >> (m_DataBitIndex & 0x7)) & 1, stateVal, nextStateVal);
         }
     }
 
@@ -163,13 +172,16 @@ public:
     }
     void ClearDataOut(uint32_t index, bool resetState = true)
     {
-        m_genOut[index].clear();
+        if (index < m_genOut.size())
+        {
+            m_genOut[index].clear();
+        }
         m_DataBitIndex = 0;
         if (resetState)
         {
             for (int i = 0; i < m_states.size(); i++)
             {
-                m_states[i] = 0;
+                m_states[i] = (m_initState >> i) & 1;
                 m_nextStates[i] = 0;
             }
         }

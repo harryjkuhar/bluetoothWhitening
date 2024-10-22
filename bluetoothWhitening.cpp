@@ -90,6 +90,65 @@ private:
     LinearFeedbackShiftRegister lsfr;
 };
 
+const char* unitTestHec =
+"unitTestHec "
+"--hec "
+"47 "
+"00 23 01 "
+"47 23 01 "
+"00 24 01 "
+"47 24 01 "
+"00 25 01 "
+"47 25 01 "
+"00 26 01 "
+"47 26 01 "
+"00 27 01 "
+"47 27 01 "
+"00 1B 01 "
+"47 1B 01 "
+"00 1C 01 "
+"47 1C 01 "
+"00 1D 01 "
+"47 1D 01 "
+"00 1E 01 "
+"47 1E 01 "
+"00 1F 01 "
+"47 1F 01 "
+"--e "
+"E1 06 32 D5 5A BD E2 05 8A 6D 9E 79 4D AA 25 C2 9D 7A F5 12 ";
+class BluetoothHec
+{
+public:
+    const uint32_t bluetoothHecPoly = 0x1A7;
+    const uint32_t bluetoothHecRegCnt = 8;
+    const uint32_t bluetoothHecPayloadBitCnt = 10;
+
+    BluetoothHec(uint8_t uap)
+        :lsfr(bluetoothHecRegCnt, uap)
+    {
+        // poly from bluetooth spec for whitening
+        lsfr.AddGaloisPoly(bluetoothHecPoly);
+        // standard generator, only including output of the final register
+        lsfr.AddGeneratorPoly(1 << (bluetoothHecRegCnt - 1));
+        lsfr.AddInputPoly(bluetoothHecPoly);
+    }
+
+    void CalcHec(uint8_t uap, std::vector<uint8_t>& dataIn, uint8_t& hecVal)
+    {
+        size_t dataIndex = 0;
+        
+        lsfr.Reset(uap);
+        lsfr.Shift(bluetoothHecPayloadBitCnt, dataIn);
+
+        hecVal = (uint8_t)lsfr.GetState();
+    }
+
+private:
+
+    LinearFeedbackShiftRegister lsfr;
+};
+
+
 const char* unitTestCrc =
 "unitTestCrc "
 "--c "
@@ -175,6 +234,7 @@ private:
 std::vector<std::string> unitTests =
 {
     unitTestWhitening,
+    unitTestHec,
     unitTestCrc,
     unitTestFec23
 };
@@ -199,6 +259,7 @@ bool seedByteParsed = false;
 bool forcebinaryFile = false;
 bool crcMode = false;
 bool fecMode = false;
+bool hecMode = false;
 bool testResults = false;
 int unitTestIndex = -1;
 int unitTestPassed = 0;
@@ -273,6 +334,7 @@ static void parseArgs(std::vector<std::string> args)
     forcebinaryFile = false;
     crcMode = false;
     fecMode = false;
+    hecMode = false;
     testResults = false;
 
     for (int i = 1; i < args.size(); i++)
@@ -283,6 +345,10 @@ static void parseArgs(std::vector<std::string> args)
         {
             unitTestIndex = 0;
             return;
+        }
+        else if (args[i] == "--hec")
+        {
+            hecMode = true;
         }
         else if (args[i] == "--e")
         {
@@ -382,7 +448,25 @@ int main(int argc, const char* argv[])
             exit(-3);
         }
 
-        if (crcMode)
+        if (hecMode)
+        {
+            // --hec 47 00 23 01 47 23 01 00 24 01 47 24 01 00 25 01 47 25 01 00 26 01 47 26 01 00 27 01 47 27 01 00 1B 01 47 1B 01 00 1C 01 47 1C 01 00 1D 01 47 1D 01 00 1E 01 47 1E 01 00 1F 01 47 1F 01 --e E1 06 32 D5 5A BD E2 05 8A 6D 9E 79 4D AA 25 C2 9D 7A F5 12 
+            // --hec 47 00 23 01 --e E1 
+            uint8_t hecVal = 0;
+            BluetoothHec hec(0);
+            auto testDataIt = testData.begin();
+            dataOut.clear();
+            for (size_t i = 0; (i + 2) < testData.size(); i += 3, testDataIt+=3)
+            {
+                std::vector<uint8_t> fecData(testDataIt+1, testDataIt + 3);
+                hec.CalcHec(testDataIt[0], fecData, hecVal);
+                
+                printf("uap %02X data %02X %02X hec %02X\n", testDataIt[0], fecData[0], fecData[1], hecVal);
+
+                dataOut.push_back(hecVal);
+            }
+        }
+        else if (crcMode)
         {
             // --c 47 4E 01 02 03 04 05 06 07 08 09 6D D2
             uint16_t crcVal;
