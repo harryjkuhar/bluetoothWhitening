@@ -76,7 +76,7 @@ public:
         m_GeneratorInputs.emplace_back();
         m_genOut.emplace_back();
         std::vector<uint32_t>& genIn = m_GeneratorInputs[m_GeneratorInputs.size()-1];
-        
+
         for (uint32_t i = 0; i < polyBitCount; i++)
         {
             if (((poly >> i) & 1) == 1)
@@ -85,7 +85,7 @@ public:
             }
         }
     }
-    
+
     void AddInputPoly(uint32_t poly)
     {
         m_DataInputPoly = poly;
@@ -107,7 +107,7 @@ public:
                 {
                     m_genOut[genIndex].m_workByte ^= m_states[genIn[regIndex]] ? m_BitShiftValue : 0;
                 }
-                
+
                 if (m_genOut[genIndex].m_bitIndex < 7)
                 {
                     m_genOut[genIndex].m_bitIndex++;
@@ -128,19 +128,19 @@ public:
                 }
 
             }
-            uint32_t stateVal = GetState();
+//            uint32_t stateVal = GetState();
             for (uint32_t regIndex = 0; regIndex < m_registerCount; regIndex++)
             {
                 m_states[regIndex] = m_nextStates[regIndex];
             }
-            uint32_t nextStateVal = GetState();
+//            uint32_t nextStateVal = GetState();
 //            printf("stateChange %u %08X -> %08X \n", (dataPayload[m_DataBitIndex / 8] >> (m_DataBitIndex & 0x7)) & 1, stateVal, nextStateVal);
         }
     }
 
     uint32_t XorInputs(uint32_t regIndex, const std::vector<uint8_t>& dataPayload = {})
     {
-        uint32_t output = 0;
+        uint32_t output = 0 ;
         for(uint32_t i = 0; i < m_registerInputs[regIndex].size(); i++)
         {
             uint32_t stateIndex = m_registerInputs[regIndex][i];
@@ -159,8 +159,8 @@ public:
         return output;
     }
 
-    std::vector<uint8_t> GetDataOut(uint32_t index) 
-    { 
+    std::vector<uint8_t> GetDataOut(uint32_t index)
+    {
         if (m_genOut[index].m_bitIndex != 0)
         {
             m_genOut[index].m_workByte >>= 7 - m_genOut[index].m_bitIndex;
@@ -168,7 +168,7 @@ public:
             m_genOut[index].m_bitIndex = 0;
             m_genOut[index].m_workByte = 0;
         }
-        return m_genOut[index].m_dataOut; 
+        return m_genOut[index].m_dataOut;
     }
     void ClearDataOut(uint32_t index, bool resetState = true)
     {
@@ -179,7 +179,7 @@ public:
         m_DataBitIndex = 0;
         if (resetState)
         {
-            for (int i = 0; i < m_states.size(); i++)
+            for (size_t i = 0; i < m_states.size(); i++)
             {
                 m_states[i] = (m_initState >> i) & 1;
                 m_nextStates[i] = 0;
@@ -212,7 +212,7 @@ private:
 //    std::vector<uint32_t> m_generatorPolys;
     std::vector<std::vector <uint32_t>> m_registerInputs;
     std::vector<std::vector <uint32_t>> m_GeneratorInputs;
-    
+
 
     uint32_t m_DataInputPoly;
     uint32_t m_DataBitIndex;

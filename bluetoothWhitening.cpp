@@ -135,8 +135,6 @@ public:
 
     void CalcHec(uint8_t uap, std::vector<uint8_t>& dataIn, uint8_t& hecVal)
     {
-        size_t dataIndex = 0;
-        
         lsfr.Reset(uap);
         lsfr.Shift(bluetoothHecPayloadBitCnt, dataIn);
 
@@ -174,10 +172,8 @@ public:
 
     void CalcCrc(std::vector<uint8_t>& dataIn, uint16_t& crcVal)
     {
-        size_t dataIndex = 0;
-
         lsfr.Shift(static_cast<uint32_t>(dataIn.size() * 8), dataIn);
-        
+
         crcVal = (uint16_t)lsfr.GetState();
 //        crcVal = lsfr.GetDataOut(0)[dataIn.size()] | lsfr.GetDataOut(0)[dataIn.size() + 1] << 8;
     }
@@ -213,8 +209,6 @@ public:
 
     void CalcParity(std::vector<uint8_t>& dataIn, uint8_t& parity)
     {
-        size_t dataIndex = 0;
-
         lsfr.ClearDataOut(0);
         for (int i = 0; i < 10; i++)
         {
@@ -337,7 +331,7 @@ static void parseArgs(std::vector<std::string> args)
     hecMode = false;
     testResults = false;
 
-    for (int i = 1; i < args.size(); i++)
+    for (size_t i = 1; i < args.size(); i++)
     {
         char* endPtr = nullptr;
 
@@ -397,7 +391,7 @@ int main(int argc, const char* argv[])
 {
     int iterations = 1;
     std::vector<std::string> args;
-    
+
     for (int i = 0; i < argc; i++)
     {
         args.push_back(argv[i]);
@@ -418,7 +412,7 @@ int main(int argc, const char* argv[])
             char* tempString = new char[unitTests[unitTestIndex].size()];
 
             int tempIndex = 0;
-            for (int i = 0; i < unitTests[unitTestIndex].size(); i++)
+            for (size_t i = 0; i < unitTests[unitTestIndex].size(); i++)
             {
                 char c = unitTests[unitTestIndex][i];
                 if (c != ' ')
@@ -450,8 +444,8 @@ int main(int argc, const char* argv[])
 
         if (hecMode)
         {
-            // --hec 47 00 23 01 47 23 01 00 24 01 47 24 01 00 25 01 47 25 01 00 26 01 47 26 01 00 27 01 47 27 01 00 1B 01 47 1B 01 00 1C 01 47 1C 01 00 1D 01 47 1D 01 00 1E 01 47 1E 01 00 1F 01 47 1F 01 --e E1 06 32 D5 5A BD E2 05 8A 6D 9E 79 4D AA 25 C2 9D 7A F5 12 
-            // --hec 47 00 23 01 --e E1 
+            // --hec 47 00 23 01 47 23 01 00 24 01 47 24 01 00 25 01 47 25 01 00 26 01 47 26 01 00 27 01 47 27 01 00 1B 01 47 1B 01 00 1C 01 47 1C 01 00 1D 01 47 1D 01 00 1E 01 47 1E 01 00 1F 01 47 1F 01 --e E1 06 32 D5 5A BD E2 05 8A 6D 9E 79 4D AA 25 C2 9D 7A F5 12
+            // --hec 47 00 23 01 --e E1
             uint8_t hecVal = 0;
             BluetoothHec hec(0);
             auto testDataIt = testData.begin();
@@ -460,7 +454,7 @@ int main(int argc, const char* argv[])
             {
                 std::vector<uint8_t> fecData(testDataIt+1, testDataIt + 3);
                 hec.CalcHec(testDataIt[0], fecData, hecVal);
-                
+
                 printf("uap %02X data %02X %02X hec %02X\n", testDataIt[0], fecData[0], fecData[1], hecVal);
 
                 dataOut.push_back(hecVal);
@@ -553,4 +547,4 @@ int main(int argc, const char* argv[])
         printf("\nPassed %4u of %4u tests! Unittest complete!\n", unitTestPassed, unitTestIndex);
     }
 }
- 
+
