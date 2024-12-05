@@ -23,7 +23,7 @@ int fopen_s(FILE** pFile, const char *filename, const char *mode)
 #define fscanf_s    fscanf
 #endif
 
-void TestHop(uint8_t mode, uint32_t address, uint32_t clkStart, uint32_t iterations);
+void TestHop(uint8_t mode, uint32_t address, uint32_t clkStart, uint32_t iterations, uint32_t N = 0);
 
 void printhelp(const char* exeName)
 {
@@ -47,6 +47,8 @@ uint32_t temp = 0;
 bool testResults = false;
 int unitTestIndex = -1;
 int unitTestPassed = 0;
+uint8_t koffset = 0;
+uint8_t knudge = 0;
 
 static void parseArgs(std::vector<std::string> args)
 {
@@ -63,7 +65,7 @@ static void parseArgs(std::vector<std::string> args)
     {
         char* endPtr = nullptr;
 
-        if(args[i] == "-m")
+        if(args[i] == "--m")
         {
             i++;
             if(i < args.size())
@@ -74,12 +76,39 @@ static void parseArgs(std::vector<std::string> args)
                     switch(mode)
                     {
                     case 0:
+                    case 1:
                         break;
                     default:
                         printf("Invalid mode %u\n", mode);
                         printhelp(args[0].c_str());
                         exit(-1);
                     }
+                }
+            }
+        }
+        else if (args[i] == "--kn")
+        {
+            i++;
+            if(i < args.size())
+            {
+                koffset = strtol(args[i].c_str() , &endPtr, 10);
+                if (endPtr == args[i].c_str())
+                {
+                    printf("Unable to parse koffset %s\n", args[i].c_str());
+                    exit(-1);
+                }
+            }
+        }
+        else if (args[i] == "--ko")
+        {
+            i++;
+            if(i < args.size())
+            {
+                koffset = strtol(args[i].c_str() , &endPtr, 10);
+                if (endPtr == args[i].c_str())
+                {
+                    printf("Unable to parse koffset %s\n", args[i].c_str());
+                    exit(-1);
                 }
             }
         }
@@ -220,7 +249,7 @@ uint8_t GetBit(uint32_t source, uint8_t index, uint8_t outIndex)
     uint8_t returnVal = (source >> index) & 1;
     return returnVal << outIndex;
 }
-void TestHop(uint8_t mode, uint32_t address, uint32_t clkStart, uint32_t iterations)
+void TestHop(uint8_t mode, uint32_t address, uint32_t clkStart, uint32_t iterations, uint32_t N)
 {
     // Page, Page Response
     // A23_0 = LAP of device being paged
@@ -250,33 +279,38 @@ void TestHop(uint8_t mode, uint32_t address, uint32_t clkStart, uint32_t iterati
     // F25 -> 10011 -> 0x13
     // 6EF -> 110111011 -> 0x1BB
     // EF25 -> 1110100 -> 0x74
-    uint8_t koffset = 24;
-    uint8_t knudge = 0;
-    uint32_t endClock = clkStart + iterations * 0x1000;
-    for(uint32_t clk = clkStart; clk < endClock; clk += 0x1000)
+    if(mode == 0)
     {
-        uint32_t clk16_12 = (clk >> 12) & 0x1F;
-        uint32_t clk4_20 = ((clk >> 1) & 0x1E) | (clk & 1);
-        uint32_t clk2 = 0;//(clk16_12 + koffset + knudge + (clk4_20 - clk16_12 + 32) & 0xF) & 0x1F;
-        uint8_t X = ((clk >> 12) + clk2) & 0x1F ;
-        uint8_t A = (address >> 23) & 0x1F;
-        uint8_t B = (address >> 19) & 0xF;
-        uint8_t C = (GetBit(address, 8, 4) | GetBit(address, 6, 3) | GetBit(address, 4, 2) | GetBit(address, 2, 1) | GetBit(address, 0, 0))  & 0x1F;
-        uint16_t D = (address >> 10) & 0x1FF;
-        uint8_t E = (GetBit(address, 13, 6) | GetBit(address, 11, 5) | GetBit(address, 9, 4) | GetBit(address, 7, 3) | GetBit(address, 5, 2) | GetBit(address, 3, 1) | GetBit(address, 1, 0))  & 0x7F;
-        uint8_t F = 0;
-        uint8_t Y1 = 0;
-        uint8_t Y2 = 0;
-        uint8_t channel = SelectionKernel(X, A, B, C, D, E, F, Y1, Y2);
-        printf("address %08X clk %08X channel %2u\n", address, clk, channel);
-
-        if(clk + 0x1000 >= endClock)
+        uint32_t endClock = clkStart + iterations * 0x1000;
+        for(uint32_t clk = clkStart; clk < endClock; clk += 0x1000)
         {
-            printf("X %08X A %08X B %08X C %08X D %08X E %08X F %08X ADDR %08X\n", X, A, B, C, D, E, F, address);
+            uint32_t clk16_12 = (clk >> 12) & 0x1F;
+            uint32_t clk4_20 = ((clk >> 1) & 0x1E) | (clk & 1);
+            uint32_t clk2 = 0;//(clk16_12 + koffset + knudge + (clk4_20 - clk16_12 + 32) & 0xF) & 0x1F;
+            uint8_t X = ((clk >> 12) + clk2) & 0x1F ;
+            uint8_t A = (address >> 23) & 0x1F;
+            uint8_t B = (address >> 19) & 0xF;
+            uint8_t C = (GetBit(address, 8, 4) | GetBit(address, 6, 3) | GetBit(address, 4, 2) | GetBit(address, 2, 1) | GetBit(address, 0, 0))  & 0x1F;
+            uint16_t D = (address >> 10) & 0x1FF;
+            uint8_t E = (GetBit(address, 13, 6) | GetBit(address, 11, 5) | GetBit(address, 9, 4) | GetBit(address, 7, 3) | GetBit(address, 5, 2) | GetBit(address, 3, 1) | GetBit(address, 1, 0))  & 0x7F;
+            uint8_t F = 0;
+            uint8_t Y1 = 0;
+            uint8_t Y2 = 0;
+            uint8_t channel = SelectionKernel(X, A, B, C, D, E, F, Y1, Y2);
+            printf("address %08X clk %08X channel %2u\n", address, clk, channel);
+
+            if(clk + 0x1000 >= endClock)
+            {
+                printf("X %08X A %08X B %08X C %08X D %08X E %08X F %08X ADDR %08X\n", X, A, B, C, D, E, F, address);
+            }
         }
     }
 
 
+    // Page hopping Sequence:
+    // Xp = [CLKE16_13 + koffset + knudge + (CLKE4_2,0 - CLKE16_12 + 32) % 16] ^ 32
+    // koffset = 24 // A-train, 8 // B-train
+    // knudge = 0 // 1st 2xNpage repetitions, Even // > 2xNpage
     //        Page,      Inquiry
     // X =        Xp4_0, Xi4_0
     // Y1 =       CLKE1, CLKN1
@@ -288,17 +322,78 @@ void TestHop(uint8_t mode, uint32_t address, uint32_t clkStart, uint32_t iterati
     // E  = A13,11,9,7,5,3,1
     // F  = 0
     // F' = n/a
+    if(mode == 1)
+    {
+        uint32_t endClock = clkStart + iterations * 0x04;
+
+        for(uint32_t clk = clkStart; clk < endClock; clk++)
+        {
+            uint32_t clk16_12 = (clk >> 12) & 0x1F;
+            uint32_t clk4_20 = ((clk >> 1) & 0x0E) | (clk & 1);
+            uint32_t Xp = (clk16_12 + koffset + knudge + ((clk4_20 - clk16_12 + 32) & 0xF)) & 0x1F;
+            uint8_t X = Xp;//((clk >> 12) + clk2) & 0x1F ;
+            uint8_t A = (address >> 23) & 0x1F;
+            uint8_t B = (address >> 19) & 0xF;
+            uint8_t C = (GetBit(address, 8, 4) | GetBit(address, 6, 3) | GetBit(address, 4, 2) | GetBit(address, 2, 1) | GetBit(address, 0, 0))  & 0x1F;
+            uint16_t D = (address >> 10) & 0x1FF;
+            uint8_t E = (GetBit(address, 13, 6) | GetBit(address, 11, 5) | GetBit(address, 9, 4) | GetBit(address, 7, 3) | GetBit(address, 5, 2) | GetBit(address, 3, 1) | GetBit(address, 1, 0))  & 0x7F;
+            uint8_t F = 0;
+            uint8_t Y1 = (clk >> 1) & 1;
+            uint8_t Y2 = (Y1 * 32);
+            uint8_t channel = SelectionKernel(X, A, B, C, D, E, F, Y1, Y2);
+            if((clk & 0x03) >= 2)
+            {
+                printf("RXTick      address %08X clk %08X channel %2u\n", address, clk, channel);
+            }
+            else
+            {
+                printf("address %08X clk %08X channel %2u\n", address, clk, channel);
+            }
+
+
+            if(clk + 1 >= endClock)
+            {
+                printf("X %08X A %08X B %08X C %08X D %08X E %08X F %08X ADDR %08X\n", X, A, B, C, D, E, F, address);
+            }
+        }
+    }
     // Central Page Resp, Peripheral Page Resp, Inquiry Respo
     // X =      Xprc4_0,    Xprp4_0,              Xir4_0
     // Y1 =       CLKE1,      CLKN1,                   1
     // Y2 = 32 x  CLKE1, 32 x CLKN1,               32 x 1
     // A  = A27_23
-    // ;B  = A22_19
+    // B  = A22_19
     // C  = A8,6,4,2,0
     // D  = A18_10
     // E  = A13,11,9,7,5,3,1
     // F  = 0
     // F' = n/a
+    if(mode == 2)
+    {
+        uint32_t endClock = clkStart + iterations * 0x1000;
+        for(uint32_t clk = clkStart; clk < endClock; clk += 0x1000)
+        {
+            uint32_t clk16_12 = (clk >> 12) & 0x1F;
+            uint32_t clk4_20 = ((clk >> 1) & 0x1E) | (clk & 1);
+            uint32_t Xp = (clk16_12 + koffset + knudge + (clk4_20 - clk16_12 + 32) & 0xF) & 0x1F;
+            uint8_t X = Xp;//((clk >> 12) + clk2) & 0x1F ;
+            uint8_t A = (address >> 23) & 0x1F;
+            uint8_t B = (address >> 19) & 0xF;
+            uint8_t C = (GetBit(address, 8, 4) | GetBit(address, 6, 3) | GetBit(address, 4, 2) | GetBit(address, 2, 1) | GetBit(address, 0, 0))  & 0x1F;
+            uint16_t D = (address >> 10) & 0x1FF;
+            uint8_t E = (GetBit(address, 13, 6) | GetBit(address, 11, 5) | GetBit(address, 9, 4) | GetBit(address, 7, 3) | GetBit(address, 5, 2) | GetBit(address, 3, 1) | GetBit(address, 1, 0))  & 0x7F;
+            uint8_t F = 0;
+            uint8_t Y1 = 0;
+            uint8_t Y2 = 0;
+            uint8_t channel = SelectionKernel(X, A, B, C, D, E, F, Y1, Y2);
+            printf("address %08X clk %08X channel %2u\n", address, clk, channel);
+
+            if(clk + 0x1000 >= endClock)
+            {
+                printf("X %08X A %08X B %08X C %08X D %08X E %08X F %08X ADDR %08X\n", X, A, B, C, D, E, F, address);
+            }
+        }
+    }
     // Connection State
     // X = CLK6_2
     // Y1 = CLK1
@@ -310,11 +405,35 @@ void TestHop(uint8_t mode, uint32_t address, uint32_t clkStart, uint32_t iterati
     // E  = A13,11,9,7,5,3,1
     // F  = 16 x CLK27_7 % 79
     // F' = 16 x CLK27_7 % N
+    if(mode == 2)
+    {
+        uint32_t endClock = clkStart + iterations * 0x1000;
+        for(uint32_t clk = clkStart; clk < endClock; clk += 0x1000)
+        {
+            uint32_t clk16_12 = (clk >> 12) & 0x1F;
+            uint32_t clk4_20 = ((clk >> 1) & 0x1E) | (clk & 1);
+            uint32_t Xp = (clk16_12 + koffset + knudge + (clk4_20 - clk16_12 + 32) & 0xF) & 0x1F;
+            uint8_t X = ((clk >> 2)) & 0x1F ;
+            uint8_t A = ((address >> 23) & 0x1F) ^ ((clk >> 21)&0x1F);
+            uint8_t B = (address >> 19) & 0xF;
+            uint8_t C = (GetBit(address, 8, 4) | GetBit(address, 6, 3) | GetBit(address, 4, 2) | GetBit(address, 2, 1) | GetBit(address, 0, 0))  & 0x1F;
+            C ^= ((clk >> 16) & 0x1F);
+            uint16_t D = (address >> 10) & 0x1FF;
+            D ^= ((clk >> 7) & 0x1F);
+            uint8_t E = (GetBit(address, 13, 6) | GetBit(address, 11, 5) | GetBit(address, 9, 4) | GetBit(address, 7, 3) | GetBit(address, 5, 2) | GetBit(address, 3, 1) | GetBit(address, 1, 0))  & 0x7F;
+            uint8_t F = (16 * ((clk>>7)&0x1FFFFF)) % 79;
+            uint8_t Fprime = (16 * ((clk>>7)&0x1FFFFF)) % N; // what is N
+            uint8_t Y1 = clk & 1;
+            uint8_t Y2 = 32 * Y1;// this cant be right
+            uint8_t channel = SelectionKernel(X, A, B, C, D, E, F, Y1, Y2);
+            printf("address %08X clk %08X channel %2u\n", address, clk, channel);
 
-    // Page hopping Sequence:
-    // Xp = [CLKE16_13 + koffset + knudge + (CLKE4_2,0 - CLKE16_12 + 32) % 16] ^ 32
-    // koffset = 24 // A-train, 8 // B-train
-    // knudge = 0 // 1st 2xNpage repetitions, Even // > 2xNpage
+            if(clk + 0x1000 >= endClock)
+            {
+                printf("X %08X A %08X B %08X C %08X D %08X E %08X F %08X ADDR %08X\n", X, A, B, C, D, E, F, address);
+            }
+        }
+    }
 
 }
 
